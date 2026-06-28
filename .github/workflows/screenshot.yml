@@ -2,6 +2,8 @@ name: Daily Free Press Screenshot
 
 on:
   schedule:
+    # 9am Pacific = 4pm UTC (March-November, PDT)
+    # Change to '0 17 * * *' for November-March (PST)
     - cron: '0 16 * * *'
   workflow_dispatch:
 
@@ -11,42 +13,29 @@ permissions:
 jobs:
   screenshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
+    
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Take screenshot of The Free Press
+        uses: karol-brejna-i/webpage-screenshot-action@v1
         with:
-          node-version: '22'
+          url: https://www.thefp.com
+          output: thefreepress-${{ github.run_id }}.png
+          mode: page
 
-      - name: Install npm dependencies
-        run: npm install
-
-      - name: Take screenshot
-        run: npm run screenshot
-
-      - name: Upload to releases
-        if: success()
+      - name: Upload to Release
         uses: softprops/action-gh-release@v2
+        if: success()
         with:
-          files: screenshots/*.png
+          files: ${{ github.workspace }}/*.png
           tag_name: screenshot-${{ github.run_number }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload as artifact
-        if: always()
+      - name: Upload as Artifact
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: screenshots
-          path: screenshots/*.png
+          path: ${{ github.workspace }}/*.png
           retention-days: 90
