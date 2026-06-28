@@ -2,8 +2,6 @@ name: Daily Free Press Screenshot
 
 on:
   schedule:
-    # 9am Pacific = 4pm UTC (March-November, PDT)
-    # Change to '0 17 * * *' for November-March (PST)
     - cron: '0 16 * * *'
   workflow_dispatch:
 
@@ -13,19 +11,36 @@ permissions:
 jobs:
   screenshot:
     runs-on: ubuntu-latest
+    container:
+      image: node:20-bullseye
     
     steps:
-      - name: Take screenshot of The Free Press
-        uses: karol-brejna-i/webpage-screenshot-action@v1
-        with:
-          url: https://www.thefp.com
-          output: thefreepress-${{ github.run_id }}.png
-          mode: page
-          scriptBefore: |
-            await page.setViewport({ width: 1440, height: 900 });
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v2
-        if: success()
-        with:
-          files: ${{ github.workspace }}/*.png
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y chromium-browser
+          npm install puppeteer
+
+      - name: Create screenshot script
+        run: |
+          cat > screenshot.js << 'EOF'
+          const puppeteer = require('puppeteer');
+          const fs = require('fs');
+          const path = require('path');
+
+          (async () => {
+            let browser;
+            try {
+              console.log('Launching browser...');
+              browser = await puppeteer.launch({
+                executablePath: '/usr/bin/chromium-browser',
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+              });
+
+              const page = await browser.newPage();
+              await page.setViewport({ width: 1440, height: 900 });
+
+              console.log('Loading page...');
