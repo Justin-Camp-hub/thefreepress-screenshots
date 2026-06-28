@@ -2,11 +2,7 @@ name: Daily Free Press Screenshot
 
 on:
   schedule:
-    # 9am Pacific = 4pm UTC (March-November, PDT)
-    # Change to '0 17 * * *' (5pm UTC) for November-March (PST)
     - cron: '0 16 * * *'
-  
-  # Manual trigger for testing
   workflow_dispatch:
 
 permissions:
@@ -21,35 +17,33 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install system dependencies for Puppeteer
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y chromium-browser
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install npm dependencies
+        run: npm install
 
       - name: Take screenshot
         run: npm run screenshot
 
       - name: Upload to releases
         if: success()
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: screenshots/*.png
           tag_name: screenshot-${{ github.run_number }}
-          name: Screenshot ${{ github.run_id }}
-          body: "Automated screenshot from ${{ github.run_id }}"
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload as artifact (backup)
+      - name: Upload as artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
