@@ -5,46 +5,54 @@ const path = require('path');
 (async () => {
   let browser;
   try {
-    console.log('Launching browser...');
+    console.log('Launching Chromium...');
+    
+    // These flags are REQUIRED for GitHub Actions Ubuntu runners
     browser = await puppeteer.launch({
       headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-gpu'
+      ]
     });
 
     const page = await browser.newPage();
-    
-    // Set viewport to capture above-the-fold content
     await page.setViewport({ width: 1400, height: 900 });
+
+    console.log('Loading https://www.thefp.com...');
     
-    console.log('Navigating to thefp.com...');
+    // networkidle0 = waits for all network connections to close
     await page.goto('https://www.thefp.com', {
-      waitUntil: 'networkidle2',
+      waitUntil: 'networkidle0',
       timeout: 30000
     });
 
-    // Wait a moment for any lazy-loaded images
-    await page.waitForTimeout(2000);
+    // Small delay for lazy images
+    await page.waitForTimeout(1500);
 
-    const timestamp = new Date().toISOString().split('T')[0];
-    const filename = `thefreepress-${timestamp}.png`;
-    const filepath = path.join('/tmp', filename);
+    // Create screenshots directory
+    const screenshotDir = path.join(process.env.GITHUB_WORKSPACE || '.', 'screenshots');
+    if (!fs.existsSync(screenshotDir)) {
+      fs.mkdirSync(screenshotDir, { recursive: true });
+    }
 
-    console.log(`Taking screenshot: ${filename}`);
-    await page.screenshot({ path: filepath, fullPage: false });
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filepath = path.join(screenshotDir, `thefreepress-${dateStr}.png`);
 
-    // Write metadata
-    const metafile = path.join('/tmp', 'screenshot-meta.json');
-    fs.writeFileSync(metafile, JSON.stringify({
-      timestamp: new Date().toISOString(),
-      url: 'https://www.thefp.com',
-      filename: filename
-    }, null, 2));
+    console.log(`Saving screenshot to: ${filepath}`);
+    await page.screenshot({
+      path: filepath,
+      fullPage: false // Capture above-the-fold only
+    });
 
-    console.log(`✓ Screenshot saved to ${filepath}`);
+    const stats = fs.statSync(filepath);
+    console.log(`✓ Screenshot saved (${stats.size} bytes)`);
     process.exit(0);
 
   } catch (error) {
-    console.error('Error taking screenshot:', error);
+    console.error('✗ Failed:', error.message);
+    console.error(error.stack);
     process.exit(1);
   } finally {
     if (browser) {
