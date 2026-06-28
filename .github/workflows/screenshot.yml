@@ -11,35 +11,33 @@ permissions:
 jobs:
   screenshot:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/puppeteer/puppeteer:22.6.0
     
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Create and run screenshot script
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright
+        run: npm install -D @playwright/test && npx playwright install chromium
+
+      - name: Take screenshot
         run: |
-          cat > /tmp/screenshot.js << 'EOF'
-          const puppeteer = require('puppeteer');
-          const fs = require('fs');
+          cat > screenshot.mjs << 'EOF'
+          import { chromium } from 'playwright';
           
-          (async () => {
-            const browser = await puppeteer.launch({
-              headless: true
-            });
-            const page = await browser.newPage();
-            await page.setViewport({ width: 1440, height: 900 });
-            await page.goto('https://www.thefp.com', { waitUntil: 'networkidle2', timeout: 30000 });
-            await page.waitForTimeout(1000);
-            const date = new Date().toISOString().split('T')[0];
-            await page.screenshot({ path: `/tmp/thefreepress-${date}.png`, fullPage: false });
-            await browser.close();
-          })();
+          const browser = await chromium.launch();
+          const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+          await page.goto('https://www.thefp.com', { waitUntil: 'networkidle' });
+          const date = new Date().toISOString().split('T')[0];
+          await page.screenshot({ path: `thefreepress-${date}.png`, fullPage: false });
+          await browser.close();
           EOF
           
-          node /tmp/screenshot.js
-          cp /tmp/thefreepress-*.png .
+          node screenshot.mjs
 
       - name: Upload as Artifact
         uses: actions/upload-artifact@v4
