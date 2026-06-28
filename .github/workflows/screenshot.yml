@@ -11,15 +11,35 @@ permissions:
 jobs:
   screenshot:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/puppeteer/puppeteer:22.6.0
     
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Take screenshot
+      - name: Create and run screenshot script
         run: |
-          curl -o thefreepress-$(date +%Y-%m-%d).png \
-          "https://api.screenshotapi.net/v1/screenshot?token=demo&url=https://www.thefp.com&width=1440&height=900&full_page=false"
+          cat > /tmp/screenshot.js << 'EOF'
+          const puppeteer = require('puppeteer');
+          const fs = require('fs');
+          
+          (async () => {
+            const browser = await puppeteer.launch({
+              headless: true
+            });
+            const page = await browser.newPage();
+            await page.setViewport({ width: 1440, height: 900 });
+            await page.goto('https://www.thefp.com', { waitUntil: 'networkidle2', timeout: 30000 });
+            await page.waitForTimeout(1000);
+            const date = new Date().toISOString().split('T')[0];
+            await page.screenshot({ path: `/tmp/thefreepress-${date}.png`, fullPage: false });
+            await browser.close();
+          })();
+          EOF
+          
+          node /tmp/screenshot.js
+          cp /tmp/thefreepress-*.png .
 
       - name: Upload as Artifact
         uses: actions/upload-artifact@v4
