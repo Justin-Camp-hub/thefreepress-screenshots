@@ -11,36 +11,32 @@ permissions:
 jobs:
   screenshot:
     runs-on: ubuntu-latest
-    container:
-      image: node:20-bullseye
     
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          apt-get update
-          apt-get install -y chromium-browser
-          npm install puppeteer
+      - name: Take screenshot of The Free Press
+        uses: karol-brejna-i/webpage-screenshot-action@v1
+        with:
+          url: https://www.thefp.com
+          output: thefreepress-${{ github.run_id }}.png
+          mode: wholePage
 
-      - name: Create screenshot script
-        run: |
-          cat > screenshot.js << 'EOF'
-          const puppeteer = require('puppeteer');
-          const fs = require('fs');
-          const path = require('path');
+      - name: Upload as Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: ${{ github.workspace }}/*.png
+          retention-days: 90
 
-          (async () => {
-            let browser;
-            try {
-              console.log('Launching browser...');
-              browser = await puppeteer.launch({
-                executablePath: '/usr/bin/chromium-browser',
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
-              });
-
-              const page = await browser.newPage();
-              await page.setViewport({ width: 1440, height: 900 });
-
-              console.log('Loading page...');
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          files: ${{ github.workspace }}/*.png
+          tag_name: screenshot-${{ github.run_number }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
